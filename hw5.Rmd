@@ -38,11 +38,11 @@ states %>%
 # correlation matrix to evaluate what is seen in scatterplots
 states %>%
   cor
-
-# It looks like murder is correlated both with life expectancy and illiteracy, suggesting that it is a potential confounder. Does that make sense in context? Murder is positively associated with illiteracy (higher murder rate = higher illiteracy rate) and negatively associated with life expectancy (higher murder rate = lower life expectancy)
-
-
 ```
+
+It looks like murder is correlated both with life expectancy and illiteracy, suggesting that it is a potential confounder. Specifically, murder is positively associated with illiteracy (higher murder rate = higher illiteracy rate) and negatively associated with life expectancy (higher murder rate = lower life expectancy).
+
+After examining the distribution of each vriable in the dataset, I chose to perform a log transformation on the estimates for area size, illiteracy rate, and population size, which were all skewed. 
 
 ```{r}
 states_analysis = states %>%
@@ -59,22 +59,13 @@ hist(states_analysis$log_illiteracy)
 hist(states_analysis$log_popn)
 hist(states_analysis$log_area)
 
-# check correlation between murder, illiteracy, and life expectancy after transforming illiteracy rate
-states_analysis %>%
-  dplyr::select(murder, log_illiteracy, life_exp) %>%
-  pairs
-
-states_analysis %>%
-  dplyr::select(murder, log_illiteracy, life_exp) %>%
-  cor
-# Transforming the illiteracy rate reduces the correlation with murder rate slightly (from 0.7 to 0.69)
 ```
 
 
-**Use automatic procedures to find a ‘best subset’ of the full model. Present the results and comment on the following**
+**2. Use automatic procedures to find a ‘best subset’ of the full model. Present the results and comment on the following**
 
 ```{r}
-# backwards elimination
+## backwards elimination
 summary(lm(life_exp ~ ., data = states_analysis))
 summary(lm(life_exp ~ murder + hs_grad + frost + log_area + log_illiteracy + log_popn, data = states_analysis))
 summary(lm(life_exp ~ murder + hs_grad + frost + log_illiteracy + log_popn, data = states_analysis))
@@ -82,7 +73,8 @@ summary(lm(life_exp ~ murder + hs_grad + frost + log_illiteracy + log_popn, data
 b.fit = lm(life_exp ~ murder + hs_grad + frost + log_popn, data = states_analysis)
 summary(b.fit)
 
-# forwards process
+
+## forwards process
 summary(lm(life_exp ~ murder, data = states_analysis))
 summary(lm(life_exp ~ hs_grad, data = states_analysis))
 summary(lm(life_exp ~ frost, data = states_analysis))
@@ -90,6 +82,41 @@ summary(lm(life_exp ~ log_area, data = states_analysis))
 summary(lm(life_exp ~ log_illiteracy, data = states_analysis))
 summary(lm(life_exp ~ log_popn, data = states_analysis))
 
+# murder has lowest p-val. Start adding secondary vars
 summary(lm(life_exp ~ murder + hs_grad, data = states_analysis))
+summary(lm(life_exp ~ murder + frost, data = states_analysis))
+summary(lm(life_exp ~ murder + log_area, data = states_analysis))
+summary(lm(life_exp ~ murder + log_illiteracy, data = states_analysis))
+summary(lm(life_exp ~ murder + log_popn, data = states_analysis))
+
+# murder + hs_grad
+summary(lm(life_exp ~ murder + hs_grad + frost, data = states_analysis))
+summary(lm(life_exp ~ murder + hs_grad + log_area, data = states_analysis))
+summary(lm(life_exp ~ murder + hs_grad + log_illiteracy, data = states_analysis))
+summary(lm(life_exp ~ murder + hs_grad + log_popn, data = states_analysis))
+
+# murder + hs_grad + log_popn
+summary(lm(life_exp ~ murder + hs_grad + log_popn + frost, data = states_analysis))
+summary(lm(life_exp ~ murder + hs_grad + log_popn + log_area, data = states_analysis))
+summary(lm(life_exp ~ murder + hs_grad + log_popn + log_illiteracy, data = states_analysis))
+
+# murder + hs_grad + log_popn + frost
+summary(lm(life_exp ~ murder + hs_grad + log_popn + frost + log_area, data = states_analysis))
+summary(lm(life_exp ~ murder + hs_grad + log_popn + frost + log_illiteracy, data = states_analysis))
+
+f.fit = lm(life_exp ~ murder + hs_grad + log_popn + frost, data = states_analysis)
+summary(f.fit)
+
+
+## Stepwise
+step.fit = step(lm(life_exp ~ ., data = states_analysis))
+
 ```
 
+All automatic processes conclude the same model, using percent increase in population size (log(population)), rate of high school graduation (hs_grad), murder rate per 100,000 (murder), and average number of days annually with temperatures below freezing (frost) as predictors of life expectancy. 
+
+'Frost' is the least significant predictor, with a p-value of 0.043. No variables were seen to be a "close call" at the 5% significance level.
+
+There is a correlation between illiteracy (with and without log transformation) and high school graduation rate (`r cor(states$illiteracy, states$hs_grad)`), but my model includes only high school graduation rate as a predictor.
+
+**3. Use criterion-based procedures studied in class to guide your selection of the ‘best subset’. Summarize your results (tabular or graphical)**
