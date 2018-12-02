@@ -1,0 +1,95 @@
+---
+title: "Homework 6"
+author: "Alyssa Vanderbeek (amv2187)"
+date: "3 December 2018"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(faraway)
+library(HH)
+```
+
+```{r}
+states = state.x77 %>% # load data from faraway package
+  as.data.frame() %>%
+  janitor::clean_names()
+```
+
+**1. Explore the dataset and generate appropriate descriptive statistics and relevant graphs for all variables of interest (continuous and categorical) – no test required. Be selective! Even if you create 20 plots, you don’t want to show them all.**
+
+```{r}
+
+# table of summary stats
+states %>%
+  skimr::skim_to_list() %>%
+  as.data.frame %>%
+  dplyr::select(1, 2, 5:11) %>%
+  `colnames<-`(c(' ', 'NA', 'Mean', 'Std. Dev.', 'Min', '1st Q', 'Median', '3rd Q', 'Max')) %>%
+  knitr::kable()
+
+# scatterplot to assess correlation between vars
+states %>%
+  pairs
+
+# correlation matrix to evaluate what is seen in scatterplots
+states %>%
+  cor
+
+# It looks like murder is correlated both with life expectancy and illiteracy, suggesting that it is a potential confounder. Does that make sense in context? Murder is positively associated with illiteracy (higher murder rate = higher illiteracy rate) and negatively associated with life expectancy (higher murder rate = lower life expectancy)
+
+
+```
+
+```{r}
+states_analysis = states %>%
+  mutate(log_area = log(area),
+         log_illiteracy = log(illiteracy),
+         log_popn = log(population)) %>%
+  dplyr::select(-area, -population, -illiteracy)
+
+par(mfrow = c(2, 3))
+hist(states$illiteracy)
+hist(states$population)
+hist(states$area)
+hist(states_analysis$log_illiteracy)
+hist(states_analysis$log_popn)
+hist(states_analysis$log_area)
+
+# check correlation between murder, illiteracy, and life expectancy after transforming illiteracy rate
+states_analysis %>%
+  dplyr::select(murder, log_illiteracy, life_exp) %>%
+  pairs
+
+states_analysis %>%
+  dplyr::select(murder, log_illiteracy, life_exp) %>%
+  cor
+# Transforming the illiteracy rate reduces the correlation with murder rate slightly (from 0.7 to 0.69)
+```
+
+
+**Use automatic procedures to find a ‘best subset’ of the full model. Present the results and comment on the following**
+
+```{r}
+# backwards elimination
+summary(lm(life_exp ~ ., data = states_analysis))
+summary(lm(life_exp ~ murder + hs_grad + frost + log_area + log_illiteracy + log_popn, data = states_analysis))
+summary(lm(life_exp ~ murder + hs_grad + frost + log_illiteracy + log_popn, data = states_analysis))
+
+b.fit = lm(life_exp ~ murder + hs_grad + frost + log_popn, data = states_analysis)
+summary(b.fit)
+
+# forwards process
+summary(lm(life_exp ~ murder, data = states_analysis))
+summary(lm(life_exp ~ hs_grad, data = states_analysis))
+summary(lm(life_exp ~ frost, data = states_analysis))
+summary(lm(life_exp ~ log_area, data = states_analysis))
+summary(lm(life_exp ~ log_illiteracy, data = states_analysis))
+summary(lm(life_exp ~ log_popn, data = states_analysis))
+
+summary(lm(life_exp ~ murder + hs_grad, data = states_analysis))
+```
+
