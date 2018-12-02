@@ -120,3 +120,10 @@ All automatic processes conclude the same model, using percent increase in popul
 There is a correlation between illiteracy (with and without log transformation) and high school graduation rate (`r cor(states$illiteracy, states$hs_grad)`), but my model includes only high school graduation rate as a predictor.
 
 **3. Use criterion-based procedures studied in class to guide your selection of the ‘best subset’. Summarize your results (tabular or graphical)**
+
+```{r}
+leaps::leaps(x = states_analysis[, c(1, 3:8)], y = states_analysis$life_exp, nbest = 2, method = "Cp")
+
+leaps::leaps(x = states_analysis[, c(1, 3:8)], y = states_analysis$life_exp, nbest = 2, method = "adjr2")
+```
+
