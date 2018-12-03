@@ -200,18 +200,24 @@ The 11th entry showed evidence of being an influential outlier (according to Coo
 **a) Use a 10-fold cross-validation**
 
 ```{r}
-# create 10-fold training datasets
-data_train <- trainControl(method = "cv", number = 10)
 
-# Fit the model used above
-model_caret <- train((life_exp ~ murder + hs_grad + log_pop + frost),
-                   data = states_analysis,
-                   trControl = data_train,
-                   method = 'lm',
-                   na.action = na.pass)
+kfold_cv = lapply(1:10, function(i){
+  # create 10-fold training datasets
+  data_train <- trainControl(method = "cv", number = 10)
+
+  # Fit the model used above
+  model_caret <- train((life_exp ~ murder + hs_grad + log_pop + frost),
+                     data = states_analysis,
+                     trControl = data_train,
+                     method = 'lm',
+                     na.action = na.pass)
   
-# Model predictions using 4 parts of the data from training 
-model_caret
+  #return(list(model_caret$results, model_caret$resample))
+  return(model_caret$results)
+})
+
+do.call("rbind", kfold_cv) %>%
+  dplyr::select(-intercept)
 
 ```
 
@@ -221,9 +227,33 @@ model_caret
 # Perform a regression model with the original sample; calculate predicted values and residuals.
 states_analysis = states_analysis %>%
   modelr::add_predictions(life_exp_fit) %>% # add predicted birthweight
-  modelr::add_residuals(life_exp_fit) # residual of observed bwt - predicted bwt
+  modelr::add_residuals(life_exp_fit) # residual of observed bwt - predicted bwt 
+
+# boot.res <- lapply(1:10, function(i, data = states_analysis){
+#   data %>%
+#     rowwise %>%
+#     mutate(rand_res = sample(resid, replace = T, size = 1), # random sampling of residuals
+#            boot_y = pred + rand_res) # new observations
+#   
+#   new_pred = coef(lm(boot_y ~ murder + hs_grad + log_pop + frost, data = data)) # regress new obs
+#   
+#   return(new_pred)
+# })
+
+# function to bootstrap residuals and regress new predictions
+boot.res <- function(data, index){
+  data = data %>%
+    rowwise %>%
+    mutate(rand_res = sample(resid, replace = T, size = 1), # Randomly resample the residuals (with replacement), but leave the X values and predicted values unchanged.
+           boot_y = pred + rand_res) # New observations by adding the original predicted values to the bootstrap residuals
   
-# Randomly resample the residuals (with replacement), but leave the X values and predicted values unchanged.
+  new_pred = coef(lm(boot_y ~ murder + hs_grad + log_pop + frost, data = data, subset = index)) # regress new obs
+  
+  return(new_pred)
+}
+
+boot::boot(states_analysis, boot.res, 10)
+boot::boot(states_analysis, boot.res, 1000)
 
 ```
 
