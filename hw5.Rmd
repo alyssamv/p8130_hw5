@@ -6,7 +6,7 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = F, fig.width = 6, fig.height = 6)
 
 library(tidyverse)
 library(faraway)
@@ -31,20 +31,22 @@ states %>%
   as.data.frame %>%
   dplyr::select(1, 2, 5:11) %>%
   `colnames<-`(c(' ', 'NA', 'Mean', 'Std. Dev.', 'Min', '1st Q', 'Median', '3rd Q', 'Max')) %>%
-  knitr::kable()
-
-# scatterplot to assess correlation between vars
-states %>%
-  pairs
-
-# correlation matrix to evaluate what is seen in scatterplots
-states %>%
-  cor
+  knitr::kable(caption = 'Summary statistics')
 ```
 
-It looks like murder is correlated both with life expectancy and illiteracy, suggesting that it is a potential confounder. Specifically, murder is positively associated with illiteracy (higher murder rate = higher illiteracy rate) and negatively associated with life expectancy (higher murder rate = lower life expectancy).
 
-After examining the distribution of each vriable in the dataset, I chose to perform a log transformation on the estimates for area size, illiteracy rate, and population size, which were all skewed. 
+```{r}
+# scatterplot to assess correlation between vars
+states %>% pairs
+
+# correlation matrix to evaluate what is seen in scatterplots
+# states %>%
+#   cor
+```
+
+It looks like murder is correlated both with life expectancy (`r cor(states$life_exp, states$murder)`) and illiteracy (`r cor(states$murder, states$illiteracy)`), suggesting that it is a potential confounder. Specifically, murder is positively associated with illiteracy (higher murder rate = higher illiteracy rate) and negatively associated with life expectancy (higher murder rate = lower life expectancy).
+
+After examining the distribution of each variable in the dataset, I chose to perform a log transformation on the estimates for area size, illiteracy rate, and population size, which were all skewed. 
 
 ```{r}
 states_analysis = states %>%
@@ -66,6 +68,8 @@ hist(states_analysis$log_area)
 
 **2. Use automatic procedures to find a ‘best subset’ of the full model. Present the results and comment on the following**
 
+Final model using backwards elimination:
+
 ```{r}
 ## backwards elimination
 # summary(lm(life_exp ~ ., data = states_analysis))
@@ -74,8 +78,12 @@ hist(states_analysis$log_area)
 
 b.fit = lm(life_exp ~ murder + hs_grad + frost + log_pop, data = states_analysis)
 summary(b.fit)
+```
 
 
+Final model using forwards process:
+
+```{r}
 ## forwards process
 # summary(lm(life_exp ~ murder, data = states_analysis))
 # summary(lm(life_exp ~ hs_grad, data = states_analysis))
@@ -108,8 +116,11 @@ summary(b.fit)
 
 f.fit = lm(life_exp ~ murder + hs_grad + log_pop + frost, data = states_analysis)
 summary(f.fit)
+```
 
+Final model using a stepwise process:
 
+```{r}
 ## Stepwise
 step.fit = step(lm(life_exp ~ ., data = states_analysis))
 
@@ -117,13 +128,14 @@ step.fit = step(lm(life_exp ~ ., data = states_analysis))
 
 All automatic processes conclude the same model, using percent increase in population size (log(population)), rate of high school graduation (hs_grad), murder rate per 100,000 (murder), and average number of days annually with temperatures below freezing (frost) as predictors of life expectancy. 
 
-'Frost' is the least significant predictor, with a p-value of 0.043. No variables were seen to be a "close call" at the 5% significance level.
+'Frost' is the least significant predictor, with a p-value of 0.043. However, no variables were seen to be a "close call" at the 5% significance level.
 
-There is a correlation between illiteracy (with and without log transformation) and high school graduation rate (`r cor(states$illiteracy, states$hs_grad)`), but my model includes only high school graduation rate as a predictor.
+There is an observed correlation between illiteracy (with and without log transformation) and high school graduation rate (`r cor(states$illiteracy, states$hs_grad)`), but my model includes only high school graduation rate as a predictor.
 
 **3. Use criterion-based procedures studied in class to guide your selection of the ‘best subset’. Summarize your results (tabular or graphical)**
 
-```{r}
+```{r, fig.height=3, fig.width=6}
+# function to select the 'best' model
 best <- function(model, ...) 
 {
   subsets <- regsubsets(formula(model), model.frame(model), ...)
@@ -156,7 +168,7 @@ plot(1:7, rs$adjr2, xlab = "No of parameters", ylab = "Adj R2")
 
 ```
 
-According to the Cp statistics and Adjusted R^2, the ideal number of parameters is 4; as seen in the table above, those parameters are murder, hs_grad, frost, and log_pop.
+According to the Cp statistics and Adjusted R^2, the ideal number of parameters is 4; as seen in the table above, those parameters are murder, hs_grad, frost, and log_pop - the same as what was concluded in the automatic process.
 
 
 **4. Compare the two ‘subsets’ from parts 2 and 3 and recommend a ‘final’ model. Using this ‘final’ model do the following.**
@@ -176,7 +188,7 @@ outliers_y = stu_res[abs(stu_res) > 2.5]
 # Measures of influence:
 # Gives DFFITS, Cook's Distance, Hat diagonal elements, and others.
 
-influence.measures(life_exp_fit)
+# influence.measures(life_exp_fit)
 
 # Look at the Cook's distance lines / influential point output and notice obs 11 as potential Y outlier / influential point
 
@@ -187,8 +199,6 @@ plot(life_exp_fit)
 fit_nooutlier = lm(life_exp ~ murder + hs_grad + log_pop + frost, data = states_analysis[-11, ])
 summary(fit_nooutlier) # look at the results of the fitted model without the influential point
 
-par(mfrow = c(2, 2))
-plot(life_exp_fit)
 plot(fit_nooutlier)
 
 ```
@@ -217,39 +227,35 @@ kfold_cv = lapply(1:10, function(i){
 })
 
 do.call("rbind", kfold_cv) %>%
-  dplyr::select(-intercept)
+  dplyr::select(-intercept) # %>% summarise(m = mean(RMSE))
 
 ```
 
-**(b) Experiment a new, but simple bootstrap technique called “residual sampling”.**
+**(b) Experiment a new, but simple bootstrap technique called “residual sampling”. Summarize the MSE.**
 
 ```{r}
+set.seed(1)
+
 # Perform a regression model with the original sample; calculate predicted values and residuals.
 states_analysis = states_analysis %>%
   modelr::add_predictions(life_exp_fit) %>% # add predicted birthweight
-  modelr::add_residuals(life_exp_fit) # residual of observed bwt - predicted bwt 
+  modelr::add_residuals(life_exp_fit) %>% # residual of observed bwt - predicted bwt 
+  rename('pred1' = pred)
 
-# boot.res <- lapply(1:10, function(i, data = states_analysis){
-#   data %>%
-#     rowwise %>%
-#     mutate(rand_res = sample(resid, replace = T, size = 1), # random sampling of residuals
-#            boot_y = pred + rand_res) # new observations
-#   
-#   new_pred = coef(lm(boot_y ~ murder + hs_grad + log_pop + frost, data = data)) # regress new obs
-#   
-#   return(new_pred)
-# })
 
 # function to bootstrap residuals and regress new predictions
 boot.res <- function(data, index){
   data = data %>%
     rowwise %>%
     mutate(rand_res = sample(resid, replace = T, size = 1), # Randomly resample the residuals (with replacement), but leave the X values and predicted values unchanged.
-           boot_y = pred + rand_res) # New observations by adding the original predicted values to the bootstrap residuals
-  
-  new_pred = coef(lm(boot_y ~ murder + hs_grad + log_pop + frost, data = data, subset = index)) # regress new obs
-  
-  return(new_pred)
+           boot_y = pred1 + rand_res) %>% # New observations by adding the original predicted values to the bootstrap residuals
+    modelr::add_predictions(lm(boot_y ~ murder + hs_grad + log_pop + frost, data = .)) %>%
+    mutate(sq = (boot_y - pred)^2)
+
+  #  new_pred = lm(boot_y ~ murder + hs_grad + log_pop + frost, data = data, subset = index) # regress new obs
+  # return(new_pred)
+  mse = 1/(nrow(data) - 4 - 1) * sum(data$sq) # calculate mse
+  return(mse)
 }
 
 boot::boot(states_analysis, boot.res, 10)
@@ -257,3 +263,28 @@ boot::boot(states_analysis, boot.res, 1000)
 
 ```
 
+The MSE of the bootstrap method is notably smaller than that of the 10-fold cross validation. This is intuitive on a smaller dataset such as the one used here (n = 50); a 10-fold cross validation using 50 data points trains the model on subsets of ~45, whereas the bootstrapping method uses sampled sets of size 50. It may be that at this sample size, this size difference of ~5 results in the bootstrap method having less MSE. This can be verified if we perform a LOOCV process:
+
+```{r, warning=F}
+loocv = lapply(1:10, function(i){
+  # create 10-fold training datasets
+  data_train <- trainControl(method = "cv", number = 50)
+
+  # Fit the model used above
+  model_caret <- train((life_exp ~ murder + hs_grad + log_pop + frost),
+                     data = states_analysis,
+                     trControl = data_train,
+                     method = 'lm',
+                     na.action = na.pass)
+  
+  #return(list(model_caret$results, model_caret$resample))
+  return(model_caret$results)
+})
+
+do.call("rbind", loocv) %>%
+  dplyr::select(-intercept) %>% 
+  summarise(mse = mean(RMSE))
+
+```
+
+Increasing the size of the training subsets in the k-fold validation improves the MSE, though the bootstrap still performs better. Because of the senstivity of these two methods of CV, I would recommend running both to assess model performance. Both suggest that the model we selected above is subject to a fair bit of error, so we would want to revisit the model-building process. Ideally, we want a model whose performance does not vary notably by CV method AND has a small MSE. However, I think that the size of the dataset use here may unavoidably result in sensitive CV performance. A improved model will be one that reduces the MSE across both methods of CV used here. 
