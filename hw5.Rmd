@@ -164,4 +164,41 @@ According to the Cp statistics and Adjusted R^2, the ideal number of parameters 
 
 All analyses above recommend the same model using percent increase in population size (log(population)), rate of high school graduation (hs_grad), murder rate per 100,000 (murder), and average number of days annually with temperatures below freezing (frost) as predictors of life expectancy.
 
-(a) 
+```{r}
+life_exp_fit = b.fit
+
+# rstandard function gives the INTERNALLY studentized residuals 
+
+stu_res = rstandard(life_exp_fit)
+outliers_y = stu_res[abs(stu_res) > 2.5]
+
+# Measures of influence:
+# Gives DFFITS, Cook's Distance, Hat diagonal elements, and others.
+
+influence.measures(life_exp_fit)
+
+# Look at the Cook's distance lines / influential point output and notice obs 11 as potential Y outlier / influential point
+
+par(mfrow = c(2, 2))
+plot(life_exp_fit)
+
+# Examine results with and without observations 5 and 28 that have very high survivals (>2000)
+fit_nooutlier = lm(life_exp ~ murder + hs_grad + log_pop + frost, data = states_analysis[-11, ])
+summary(fit_nooutlier) # look at the results of the fitted model without the influential point
+
+par(mfrow = c(2, 2))
+plot(life_exp_fit)
+plot(fit_nooutlier)
+
+```
+
+The 11th entry showed evidence of being an influential outlier (according to Cook's distance and measure of influence). To check to see whether this entry had a significant impact on the model and its assumptions, I compared diagnostics of the model with and without the 11th point. The diagnostic plots above show that, in fact, the model assumptions (1. residuals have mean zero, 2. residuals have equal variance, 3. residuals are independent) are met for both models - with and without the potential influential point. However, we can see that without the point, the 'frost' variable is no longer a significant predictor of life expectancy, with a p-value of 0.53. 
+
+
+**Using the ‘final’ model chosen in part 4, focus on MSE to test the model predictive ability**
+**a) Use a 10-fold cross-validation**
+
+```{r}
+
+```
+
