@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(faraway)
 library(HH)
+library(leaps)
 ```
 
 ```{r}
@@ -48,7 +49,7 @@ After examining the distribution of each vriable in the dataset, I chose to perf
 states_analysis = states %>%
   mutate(log_area = log(area),
          log_illiteracy = log(illiteracy),
-         log_popn = log(population)) %>%
+         log_pop = log(population)) %>%
   dplyr::select(-area, -population, -illiteracy)
 
 par(mfrow = c(2, 3))
@@ -56,7 +57,7 @@ hist(states$illiteracy)
 hist(states$population)
 hist(states$area)
 hist(states_analysis$log_illiteracy)
-hist(states_analysis$log_popn)
+hist(states_analysis$log_pop)
 hist(states_analysis$log_area)
 
 ```
@@ -67,10 +68,10 @@ hist(states_analysis$log_area)
 ```{r}
 ## backwards elimination
 summary(lm(life_exp ~ ., data = states_analysis))
-summary(lm(life_exp ~ murder + hs_grad + frost + log_area + log_illiteracy + log_popn, data = states_analysis))
-summary(lm(life_exp ~ murder + hs_grad + frost + log_illiteracy + log_popn, data = states_analysis))
+summary(lm(life_exp ~ murder + hs_grad + frost + log_area + log_illiteracy + log_pop, data = states_analysis))
+summary(lm(life_exp ~ murder + hs_grad + frost + log_illiteracy + log_pop, data = states_analysis))
 
-b.fit = lm(life_exp ~ murder + hs_grad + frost + log_popn, data = states_analysis)
+b.fit = lm(life_exp ~ murder + hs_grad + frost + log_pop, data = states_analysis)
 summary(b.fit)
 
 
@@ -80,31 +81,31 @@ summary(lm(life_exp ~ hs_grad, data = states_analysis))
 summary(lm(life_exp ~ frost, data = states_analysis))
 summary(lm(life_exp ~ log_area, data = states_analysis))
 summary(lm(life_exp ~ log_illiteracy, data = states_analysis))
-summary(lm(life_exp ~ log_popn, data = states_analysis))
+summary(lm(life_exp ~ log_pop, data = states_analysis))
 
 # murder has lowest p-val. Start adding secondary vars
 summary(lm(life_exp ~ murder + hs_grad, data = states_analysis))
 summary(lm(life_exp ~ murder + frost, data = states_analysis))
 summary(lm(life_exp ~ murder + log_area, data = states_analysis))
 summary(lm(life_exp ~ murder + log_illiteracy, data = states_analysis))
-summary(lm(life_exp ~ murder + log_popn, data = states_analysis))
+summary(lm(life_exp ~ murder + log_pop, data = states_analysis))
 
 # murder + hs_grad
 summary(lm(life_exp ~ murder + hs_grad + frost, data = states_analysis))
 summary(lm(life_exp ~ murder + hs_grad + log_area, data = states_analysis))
 summary(lm(life_exp ~ murder + hs_grad + log_illiteracy, data = states_analysis))
-summary(lm(life_exp ~ murder + hs_grad + log_popn, data = states_analysis))
+summary(lm(life_exp ~ murder + hs_grad + log_pop, data = states_analysis))
 
-# murder + hs_grad + log_popn
-summary(lm(life_exp ~ murder + hs_grad + log_popn + frost, data = states_analysis))
-summary(lm(life_exp ~ murder + hs_grad + log_popn + log_area, data = states_analysis))
-summary(lm(life_exp ~ murder + hs_grad + log_popn + log_illiteracy, data = states_analysis))
+# murder + hs_grad + log_pop
+summary(lm(life_exp ~ murder + hs_grad + log_pop + frost, data = states_analysis))
+summary(lm(life_exp ~ murder + hs_grad + log_pop + log_area, data = states_analysis))
+summary(lm(life_exp ~ murder + hs_grad + log_pop + log_illiteracy, data = states_analysis))
 
-# murder + hs_grad + log_popn + frost
-summary(lm(life_exp ~ murder + hs_grad + log_popn + frost + log_area, data = states_analysis))
-summary(lm(life_exp ~ murder + hs_grad + log_popn + frost + log_illiteracy, data = states_analysis))
+# murder + hs_grad + log_pop + frost
+summary(lm(life_exp ~ murder + hs_grad + log_pop + frost + log_area, data = states_analysis))
+summary(lm(life_exp ~ murder + hs_grad + log_pop + frost + log_illiteracy, data = states_analysis))
 
-f.fit = lm(life_exp ~ murder + hs_grad + log_popn + frost, data = states_analysis)
+f.fit = lm(life_exp ~ murder + hs_grad + log_pop + frost, data = states_analysis)
 summary(f.fit)
 
 
@@ -122,8 +123,45 @@ There is a correlation between illiteracy (with and without log transformation) 
 **3. Use criterion-based procedures studied in class to guide your selection of the ‘best subset’. Summarize your results (tabular or graphical)**
 
 ```{r}
-leaps::leaps(x = states_analysis[, c(1, 3:8)], y = states_analysis$life_exp, nbest = 2, method = "Cp")
+best <- function(model, ...) 
+{
+  subsets <- regsubsets(formula(model), model.frame(model), ...)
+  subsets <- with(summary(subsets),
+                  cbind(p = as.numeric(rownames(which)), which, rss, rsq, adjr2, cp, bic))
+  
+  return(subsets)
+} 
 
-leaps::leaps(x = states_analysis[, c(1, 3:8)], y = states_analysis$life_exp, nbest = 2, method = "adjr2")
+best(lm(life_exp ~ ., data = states_analysis)) %>%
+  knitr::kable(., 'latex', caption = 'Criterion-based model building') %>%
+  kableExtra::kable_styling(latex_options = c("hold_position")) %>%
+  kableExtra::landscape()
+
+# leaps::leaps(x = states_analysis[, c(1, 3:8)], y = states_analysis$life_exp, nbest = 2, method = "Cp")
+
+# leaps::leaps(x = states_analysis[, c(1, 3:8)], y = states_analysis$life_exp, nbest = 2, method = "adjr2")
+
+# Summary of models for each size (one model per size)
+b = leaps::regsubsets(life_exp ~ ., data = states_analysis)
+rs = summary(b)
+
+# Plots of Cp and Adj-R2 as functions of parameters
+par(mar = c(4, 4, 1, 1))
+par(mfrow = c(1, 2))
+
+plot(1:7, rs$cp, xlab = "No of parameters", ylab = "Cp Statistic")
+abline(0, 1)
+plot(1:7, rs$adjr2, xlab = "No of parameters", ylab = "Adj R2")
+
 ```
 
+According to the Cp statistics and Adjusted R^2, the ideal number of parameters is 4; as seen in the table above, those parameters are murder, hs_grad, frost, and log_pop.
+
+
+**4. Compare the two ‘subsets’ from parts 2 and 3 and recommend a ‘final’ model. Using this ‘final’ model do the following.**
+**a) Identify any leverage and/or influential points and take appropriate measures.**
+**b) Check the model assumptions. **
+
+All analyses above recommend the same model using percent increase in population size (log(population)), rate of high school graduation (hs_grad), murder rate per 100,000 (murder), and average number of days annually with temperatures below freezing (frost) as predictors of life expectancy.
+
+(a) 
