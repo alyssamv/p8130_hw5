@@ -1,29 +1,12 @@
----
-title: "Homework 5"
-author: "Alyssa Vanderbeek (amv2187)"
-date: "3 December 2018"
-output: pdf_document
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = F, fig.width = 6, fig.height = 6)
-
 library(tidyverse)
 library(faraway)
 library(HH)
 library(leaps)
 library(caret)
-```
 
-```{r}
 states = state.x77 %>% # load data from faraway package
   as.data.frame() %>%
   janitor::clean_names()
-```
-
-**1. Explore the dataset and generate appropriate descriptive statistics and relevant graphs for all variables of interest (continuous and categorical) – no test required. Be selective! Even if you create 20 plots, you don’t want to show them all.**
-
-```{r}
 
 # table of summary stats
 states %>%
@@ -32,23 +15,14 @@ states %>%
   dplyr::select(1, 2, 5:11) %>%
   `colnames<-`(c(' ', 'NA', 'Mean', 'Std. Dev.', 'Min', '1st Q', 'Median', '3rd Q', 'Max')) %>%
   knitr::kable(caption = 'Summary statistics')
-```
 
-
-```{r}
 # scatterplot to assess correlation between vars
 states %>% pairs
 
 # correlation matrix to evaluate what is seen in scatterplots
 # states %>%
 #   cor
-```
 
-It looks like murder is correlated both with life expectancy (`r cor(states$life_exp, states$murder)`) and illiteracy (`r cor(states$murder, states$illiteracy)`), suggesting that it is a potential confounder. Specifically, murder is positively associated with illiteracy (higher murder rate = higher illiteracy rate) and negatively associated with life expectancy (higher murder rate = lower life expectancy).
-
-After examining the distribution of each variable in the dataset, I chose to perform a log transformation on the estimates for area size, illiteracy rate, and population size, which were all skewed. 
-
-```{r}
 states_analysis = states %>%
   mutate(log_area = log(area),
          log_illiteracy = log(illiteracy),
@@ -63,14 +37,6 @@ hist(states_analysis$log_illiteracy)
 hist(states_analysis$log_pop)
 hist(states_analysis$log_area)
 
-```
-
-
-**2. Use automatic procedures to find a ‘best subset’ of the full model.**
-
-Final model using backwards elimination:
-
-```{r}
 ## backwards elimination
 # summary(lm(life_exp ~ ., data = states_analysis))
 # summary(lm(life_exp ~ murder + hs_grad + frost + log_area + log_illiteracy + log_pop, data = states_analysis))
@@ -78,12 +44,7 @@ Final model using backwards elimination:
 
 b.fit = lm(life_exp ~ murder + hs_grad + frost + log_pop, data = states_analysis)
 summary(b.fit)
-```
 
-
-Final model using forwards process:
-
-```{r}
 ## forwards process
 # summary(lm(life_exp ~ murder, data = states_analysis))
 # summary(lm(life_exp ~ hs_grad, data = states_analysis))
@@ -116,34 +77,10 @@ Final model using forwards process:
 
 f.fit = lm(life_exp ~ murder + hs_grad + log_pop + frost, data = states_analysis)
 summary(f.fit)
-```
 
-Final model using a stepwise process:
-
-```{r}
 ## Stepwise
 step.fit = step(lm(life_exp ~ ., data = states_analysis))
 
-```
-
-
-**(a) Do the procedures generate the same model?**
-
-All automatic processes conclude the same model, using percent increase in population size (log(population)), rate of high school graduation (hs_grad), murder rate per 100,000 (murder), and average number of days annually with temperatures below freezing (frost) as predictors of life expectancy. 
-
-**(b) Is there any variable a close call? What was your decision: keep or discard? Provide arguments for your choice. (Note: this question might have more or less relevance depending on the ‘subset’ you choose).**
-
-No variables were seen to be a "close call" at the 5% significance level. 'Frost' is the least significant predictor, with a p-value of 0.043.
-
-**(c) Is there any association between ‘Illiteracy’ and ‘HS graduation rate’? Does your ‘subset’ contain both?**
-
-There is an observed correlation between illiteracy (with and without log transformation) and high school graduation rate (`r cor(states$illiteracy, states$hs_grad)`). This is intuitive in that we would expect that the more people who graduate from high school (high HS graduation rate), there are fewer people who are illiterate. However, my model includes only high school graduation rate as a predictor.
-
-
-
-**3. Use criterion-based procedures studied in class to guide your selection of the ‘best subset’. Summarize your results (tabular or graphical)**
-
-```{r, fig.height=3, fig.width=6}
 # function to select the 'best' model
 best <- function(model, ...) 
 {
@@ -175,18 +112,6 @@ plot(1:7, rs$cp, xlab = "No of parameters", ylab = "Cp Statistic")
 abline(0, 1)
 plot(1:7, rs$adjr2, xlab = "No of parameters", ylab = "Adj R2")
 
-```
-
-According to the Cp statistics and Adjusted R^2, the ideal number of parameters is 4; as seen in the table above, those parameters are murder, hs_grad, frost, and log_pop - the same as what was concluded in the automatic process.
-
-
-**4. Compare the two ‘subsets’ from parts 2 and 3 and recommend a ‘final’ model. Using this ‘final’ model do the following.**
-**a) Identify any leverage and/or influential points and take appropriate measures.**
-**b) Check the model assumptions. **
-
-All analyses above recommend the same model using percent increase in population size (log(population)), rate of high school graduation (hs_grad), murder rate per 100,000 (murder), and average number of days annually with temperatures below freezing (frost) as predictors of life expectancy.
-
-```{r}
 life_exp_fit = b.fit
 
 # rstandard function gives the INTERNALLY studentized residuals 
@@ -198,11 +123,7 @@ outliers_y = stu_res[abs(stu_res) > 2.5]
 # Gives DFFITS, Cook's Distance, Hat diagonal elements, and others.
 
 # influence.measures(life_exp_fit)
-```
 
-The 11th entry (Hawaii) showed evidence of being an influential outlier (according to Cook's distance and measure of influence). To check to see whether this entry had a significant impact on the model and its assumptions, I compared diagnostics of the model with and without the 11th point. The diagnostic plots below show that, in fact, the model assumptions (1. residuals have mean zero, 2. residuals have equal variance, 3. residuals are independent) are met for both models - with and without the potential influential point. However, we can see that without the point, the 'frost' variable is no longer a significant predictor of life expectancy, with a p-value of 0.53. 
-
-```{r}
 # Look at the Cook's distance lines / influential point output and notice obs 11 as potential Y outlier / influential point
 
 par(mfrow = c(2, 2))
@@ -214,27 +135,17 @@ summary(fit_nooutlier) # look at the results of the fitted model without the inf
 
 plot(fit_nooutlier)
 
-```
-
-
-
-
-**Using the ‘final’ model chosen in part 4, focus on MSE to test the model predictive ability**
-
-**(a) Use a 10-fold cross-validation (10 repeats).**
-
-```{r}
-
+## 10-fold CV
 kfold_cv = lapply(1:10, function(i){
   # create 10-fold training datasets
   data_train <- trainControl(method = "cv", number = 10)
-
+  
   # Fit the model used above
   model_caret <- train((life_exp ~ murder + hs_grad + log_pop + frost),
-                     data = states_analysis,
-                     trControl = data_train,
-                     method = 'lm',
-                     na.action = na.pass)
+                       data = states_analysis,
+                       trControl = data_train,
+                       method = 'lm',
+                       na.action = na.pass)
   
   #return(list(model_caret$results, model_caret$resample))
   return(model_caret$results)
@@ -253,11 +164,7 @@ do.call("rbind", kfold_cv) %>%
   dplyr::select(1, 3, 2, 4) %>% summarise(mse = mean(MSE),
                                           se = mean(std.error))
 
-```
-
-**(b) Experiment a new, but simple bootstrap technique called “residual sampling”. Summarize the MSE.**
-
-```{r}
+## Bootstrap
 set.seed(1)
 
 # Perform a regression model with the original sample; calculate predicted values and residuals.
@@ -275,7 +182,7 @@ boot.res <- function(data, index){
            boot_y = pred1 + rand_res) %>% # New observations by adding the original predicted values to the bootstrap residuals
     modelr::add_predictions(lm(boot_y ~ murder + hs_grad + log_pop + frost, data = .)) %>%
     mutate(sq = (boot_y - pred)^2)
-
+  
   mse = (1/(nrow(data)) * sum(data$sq)) # calculate mse
   root.mse = sqrt(mse) # rmse
   return(root.mse)
@@ -287,10 +194,3 @@ broom::tidy(boot::boot(states_analysis, boot.res, 10)) %>%
 broom::tidy(boot::boot(states_analysis, boot.res, 1000)) %>%
   rename('RMSE' = statistic) %>%
   mutate(MSE = RMSE^2)
-
-```
-
-The MSE of the bootstrap is slightly smaller than that of the 10-fold CV, however the standard error of this estimate is lower for the 10-fold CV than for the bootstrap. This is reflective of the bias-variance tradeoff, and we can conclude then that the 10-fold CV has larger bias and smaller variance, and the residual bootstrap has smaller bias and larger variance. Which method we use to cross validate the model will depend on which of these two (bias vs. variance) we are more interested in minimizing. However, as both methods are computationally inexpensive and produce slightly different MSE (one more conservative than the other), I recommend using both to test the model. 
-
-Overall, the MSE is a bit high for the model built above. After testing the predictive ability here, I would return to the model building steps, and examine potential for effect modifiers or higher order terms. On the other hand, it may be that this model is the best we can build for the outcome with the provided predictors. After all, the criterion-based analysis suggested that 4 was the ideal number of predictors. 
-
