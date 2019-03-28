@@ -12,7 +12,7 @@ install.packages('dplyr')
 install.packages('HH')                 # For VIF function
 library(dplyr)
 library(HH)
-
+ # test test test 
 
 # Read data Surgical.csv
 data_surg<-read.csv("O:\\Teaching\\Methods1\\P8130_Fall18\\Lectures\\Lecture17\\Surgical.csv")
